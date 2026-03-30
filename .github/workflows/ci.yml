@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - run: cp .env.example .env
+      - run: npm run db:generate
+      - run: npm run db:migrate -- --name ci_bootstrap
+      - run: npm run db:seed
+      - run: npm run build
+      - run: npm test

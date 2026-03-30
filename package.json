@@ -1,0 +1,29 @@
+{
+  "name": "facility-intelligence-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build --workspace @facility/domain && npm run build --workspace @facility/contracts && npm run build --workspace @facility/ui && npm run build --workspace @facility/jobs && npm run build --workspace @facility/db",
+    "build": "npm run build:packages && npm run build --workspace @facility/api && npm run build --workspace @facility/web",
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace @facility/api",
+    "dev:web": "npm run dev --workspace @facility/web",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @facility/db",
+    "db:migrate": "npm run db:migrate --workspace @facility/db --",
+    "db:seed": "npm run db:seed --workspace @facility/db"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

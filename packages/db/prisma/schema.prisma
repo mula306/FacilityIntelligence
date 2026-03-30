@@ -1,0 +1,813 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum EntityStatus {
+  active
+  inactive
+  archived
+}
+
+enum RiskLevel {
+  low
+  moderate
+  high
+  critical
+}
+
+enum ConnectivitySource {
+  manual
+  import
+  scan
+  controller
+  system
+}
+
+enum WifiBand {
+  BAND_2_4GHZ
+  BAND_5GHZ
+  BAND_6GHZ
+  UNKNOWN
+}
+
+enum WifiScanSource {
+  MANUAL
+  CSV_IMPORT
+  ANDROID_COMPANION
+}
+
+enum CoverageBand {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  DEAD_ZONE
+}
+
+enum CoverageAssessmentScope {
+  FACILITY
+  FLOOR
+  ZONE
+  ROOM
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  displayName  String
+  status       EntityStatus @default(active)
+  isEnabled    Boolean      @default(true)
+  lastLoginAt  DateTime?
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  roles        UserRole[]
+  auditLogs    AuditLog[]        @relation("AuditActor")
+  wifiSessions WifiScanSession[] @relation("WifiCollector")
+}
+
+model Role {
+  id              String       @id @default(uuid())
+  name            String
+  code            String       @unique
+  description     String?
+  status          EntityStatus @default(active)
+  notes           String?
+  permissionsJson String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  archivedAt      DateTime?
+  archivedBy      String?
+
+  users UserRole[]
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Facility {
+  id           String       @id @default(uuid())
+  name         String
+  code         String?      @unique
+  shortName    String?
+  facilityType String?
+  campusName   String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  region       String?
+  postalCode   String?
+  countryCode  String?
+  timezone     String?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  buildings                Building[]
+  floors                   Floor[]
+  zones                    Zone[]
+  rooms                    Room[]
+  hoursOfOperation         HoursOfOperation[]
+  serviceAreas             ServiceArea[]
+  contactAssignments       FacilityContactAssignment[]
+  devices                  Device[]
+  networkCircuits          NetworkCircuit[]
+  networkProfiles          NetworkProfile[]
+  accessPoints             AccessPoint[]
+  connectivityMeasurements ConnectivityMeasurement[]
+  wifiScanSessions         WifiScanSession[]
+  wifiScanSamples          WifiScanSample[]
+  coverageAssessments      CoverageAssessment[]
+  incidents                Incident[]
+  riskItems                RiskItem[]
+  readinessScores          ReadinessScore[]
+}
+
+model Building {
+  id           String       @id @default(uuid())
+  facilityId   String
+  name         String
+  code         String?
+  buildingType String?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  floors           Floor[]
+  zones            Zone[]
+  rooms            Room[]
+  devices          Device[]
+  accessPoints     AccessPoint[]
+  wifiScanSessions WifiScanSession[]
+  wifiScanSamples  WifiScanSample[]
+  coverageAssessments CoverageAssessment[]
+
+  @@unique([facilityId, code])
+}
+
+model Floor {
+  id           String       @id @default(uuid())
+  facilityId   String
+  buildingId   String
+  name         String
+  code         String?
+  floorNumber  Int
+  planImageUrl String?
+  canvasWidth  Int?
+  canvasHeight Int?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  zones            Zone[]
+  rooms            Room[]
+  planVersions     FloorPlanVersion[]
+  annotations      MapAnnotation[]
+  wifiScanSessions WifiScanSession[]
+  wifiScanSamples  WifiScanSample[]
+  coverageAssessments CoverageAssessment[]
+
+  @@unique([buildingId, floorNumber])
+}
+
+model Zone {
+  id           String       @id @default(uuid())
+  facilityId   String
+  buildingId   String
+  floorId      String
+  name         String
+  code         String?
+  zoneType     String?
+  geometryJson String?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor            Floor             @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  annotations      MapAnnotation[]
+  rooms            Room[]
+  wifiScanSessions WifiScanSession[]
+  wifiScanSamples  WifiScanSample[]
+  coverageAssessments CoverageAssessment[]
+
+  @@unique([floorId, code])
+}
+
+model Room {
+  id                  String       @id @default(uuid())
+  facilityId          String
+  buildingId          String
+  floorId             String
+  zoneId              String?
+  name                String
+  code                String?
+  roomNumber          String?
+  roomType            String?
+  clinicalCriticality RiskLevel?
+  geometryJson        String?
+  status              EntityStatus @default(active)
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  createdBy           String?
+  updatedBy           String?
+  archivedAt          DateTime?
+  archivedBy          String?
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor            Floor             @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  zone             Zone?             @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  annotations      MapAnnotation[]
+  devices          Device[]
+  accessPoints     AccessPoint[]
+  wifiScanSessions WifiScanSession[]
+  wifiScanSamples  WifiScanSample[]
+  coverageAssessments CoverageAssessment[]
+
+  @@unique([floorId, roomNumber])
+}
+
+model FloorPlanVersion {
+  id           String       @id @default(uuid())
+  floorId       String
+  name          String
+  versionLabel  String?
+  assetUrl      String?
+  canvasWidth   Int?
+  canvasHeight  Int?
+  source        String
+  isCurrent     Boolean      @default(false)
+  status        EntityStatus @default(active)
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  floor        Floor           @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  annotations  MapAnnotation[]
+
+  @@index([floorId, isCurrent])
+}
+
+model MapAnnotation {
+  id                 String       @id @default(uuid())
+  floorId            String
+  floorPlanVersionId String?
+  zoneId             String?
+  roomId             String?
+  title              String
+  annotationType     String
+  severity           RiskLevel?
+  geometryJson       String
+  status             EntityStatus @default(active)
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  createdBy          String?
+  updatedBy          String?
+  archivedAt         DateTime?
+  archivedBy         String?
+
+  floor            Floor             @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  floorPlanVersion FloorPlanVersion? @relation(fields: [floorPlanVersionId], references: [id], onDelete: SetNull)
+  zone             Zone?             @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  room             Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([floorId, annotationType])
+}
+
+model Contact {
+  id           String       @id @default(uuid())
+  name         String
+  code         String?
+  firstName    String
+  lastName     String
+  title        String?
+  email        String?
+  phone        String?
+  mobilePhone  String?
+  organization String?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  assignments FacilityContactAssignment[]
+}
+
+model ContactRole {
+  id          String       @id @default(uuid())
+  name        String
+  code        String?
+  description String?
+  status      EntityStatus @default(active)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  archivedAt  DateTime?
+  archivedBy  String?
+
+  assignments FacilityContactAssignment[]
+}
+
+model FacilityContactAssignment {
+  id                 String       @id @default(uuid())
+  facilityId         String
+  buildingId         String?
+  floorId            String?
+  zoneId             String?
+  roomId             String?
+  contactId          String
+  contactRoleId      String
+  escalationPriority Int?
+  isPrimary          Boolean      @default(false)
+  status             EntityStatus @default(active)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  createdBy          String?
+  updatedBy          String?
+  archivedAt         DateTime?
+  archivedBy         String?
+
+  facility    Facility    @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  contactRole ContactRole @relation(fields: [contactRoleId], references: [id], onDelete: Restrict)
+}
+
+model ServiceArea {
+  id         String       @id @default(uuid())
+  facilityId String
+  buildingId String?
+  floorId    String?
+  name       String
+  code       String?
+  status     EntityStatus @default(active)
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  createdBy  String?
+  updatedBy  String?
+  archivedAt DateTime?
+  archivedBy String?
+
+  facility Facility           @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  hours    HoursOfOperation[]
+}
+
+model HoursOfOperation {
+  id            String       @id @default(uuid())
+  facilityId    String
+  serviceAreaId String?
+  dayOfWeek     Int
+  opensAt       String
+  closesAt      String
+  overnight     Boolean      @default(false)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  status        EntityStatus @default(active)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  createdBy     String?
+  updatedBy     String?
+  archivedAt    DateTime?
+  archivedBy    String?
+
+  facility    Facility     @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  serviceArea ServiceArea? @relation(fields: [serviceAreaId], references: [id], onDelete: SetNull)
+}
+
+model DeviceType {
+  id           String       @id @default(uuid())
+  name         String
+  code         String?
+  manufacturer String?
+  status       EntityStatus @default(active)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+  updatedBy    String?
+  archivedAt   DateTime?
+  archivedBy   String?
+
+  devices Device[]
+}
+
+model Device {
+  id             String       @id @default(uuid())
+  facilityId     String
+  buildingId     String?
+  floorId        String?
+  zoneId         String?
+  roomId         String?
+  deviceTypeId   String
+  name           String
+  code           String?
+  hostname       String?
+  serialNumber   String?
+  assetTag       String?
+  ipAddress      String?
+  macAddress     String?
+  lifecycleState String?
+  ownerContactId String?
+  status         EntityStatus @default(active)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  archivedAt     DateTime?
+  archivedBy     String?
+
+  facility   Facility   @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building   Building?  @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  room       Room?      @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  deviceType DeviceType @relation(fields: [deviceTypeId], references: [id], onDelete: Restrict)
+}
+
+model NetworkCircuit {
+  id                String       @id @default(uuid())
+  facilityId        String
+  name              String
+  code              String?
+  providerName      String?
+  circuitIdentifier String?
+  bandwidthDownMbps Decimal?
+  bandwidthUpMbps   Decimal?
+  serviceLevel      String?
+  status            EntityStatus @default(active)
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  archivedAt        DateTime?
+  archivedBy        String?
+
+  facility     Facility                  @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  measurements ConnectivityMeasurement[]
+}
+
+model NetworkProfile {
+  id          String       @id @default(uuid())
+  facilityId  String
+  name        String
+  code        String?
+  networkType String?
+  vlanName    String?
+  subnetCidr  String?
+  status      EntityStatus @default(active)
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdBy   String?
+  updatedBy   String?
+  archivedAt  DateTime?
+  archivedBy  String?
+
+  facility     Facility      @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  accessPoints AccessPoint[]
+}
+
+model AccessPoint {
+  id               String       @id @default(uuid())
+  facilityId       String
+  buildingId       String?
+  floorId          String?
+  zoneId           String?
+  roomId           String?
+  networkProfileId String?
+  name             String
+  code             String?
+  model            String?
+  macAddress       String?
+  geometryJson     String?
+  status           EntityStatus @default(active)
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  createdBy        String?
+  updatedBy        String?
+  archivedAt       DateTime?
+  archivedBy       String?
+
+  facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building       Building?       @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  room           Room?           @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  networkProfile NetworkProfile? @relation(fields: [networkProfileId], references: [id], onDelete: SetNull)
+  measurements   ConnectivityMeasurement[]
+  wifiSamples    WifiScanSample[]
+}
+
+model ConnectivityMeasurement {
+  id               String             @id @default(uuid())
+  facilityId       String
+  networkCircuitId String?
+  accessPointId    String?
+  source           ConnectivitySource @default(manual)
+  measuredAt       DateTime
+  downloadMbps     Decimal?
+  uploadMbps       Decimal?
+  latencyMs        Decimal?
+  packetLossPct    Decimal?
+  notes            String?
+  status           EntityStatus       @default(active)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  createdBy        String?
+  updatedBy        String?
+  archivedAt       DateTime?
+  archivedBy       String?
+
+  facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  networkCircuit NetworkCircuit? @relation(fields: [networkCircuitId], references: [id], onDelete: SetNull)
+  accessPoint    AccessPoint?    @relation(fields: [accessPointId], references: [id], onDelete: SetNull)
+}
+
+model WifiScanSession {
+  id                   String         @id @default(uuid())
+  facilityId           String
+  buildingId           String
+  floorId              String
+  zoneId               String?
+  roomId               String?
+  collectorUserId      String?
+  collectorDeviceLabel String?
+  name                 String
+  code                 String?
+  startedAt            DateTime
+  endedAt              DateTime?
+  source               WifiScanSource
+  status               EntityStatus   @default(active)
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  createdBy            String?
+  updatedBy            String?
+  archivedAt           DateTime?
+  archivedBy           String?
+
+  facility    Facility              @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building    Building              @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor       Floor                 @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  zone        Zone?                 @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  room        Room?                 @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  collector   User?                 @relation("WifiCollector", fields: [collectorUserId], references: [id], onDelete: SetNull)
+  samples     WifiScanSample[]
+  assessments CoverageAssessment[]
+
+  @@index([facilityId, status])
+  @@index([floorId, startedAt])
+}
+
+model WifiScanSample {
+  id                String       @id @default(uuid())
+  wifiScanSessionId String
+  facilityId        String
+  buildingId        String
+  floorId           String
+  zoneId            String?
+  roomId            String?
+  accessPointId     String?
+  ssid              String
+  bssid             String
+  rssi              Int
+  frequencyMHz      Int?
+  channel           Int?
+  band              WifiBand
+  sampledAt         DateTime
+  coordinateX       Decimal?
+  coordinateY       Decimal?
+  status            EntityStatus @default(active)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  archivedAt        DateTime?
+  archivedBy        String?
+
+  session     WifiScanSession @relation(fields: [wifiScanSessionId], references: [id], onDelete: Cascade)
+  facility    Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building    Building        @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor       Floor           @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  zone        Zone?           @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  room        Room?           @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  accessPoint AccessPoint?    @relation(fields: [accessPointId], references: [id], onDelete: SetNull)
+
+  @@index([wifiScanSessionId, sampledAt])
+  @@index([floorId, sampledAt])
+}
+
+model CoverageAssessment {
+  id                  String                  @id @default(uuid())
+  scope               CoverageAssessmentScope
+  facilityId          String
+  buildingId          String?
+  floorId             String?
+  zoneId              String?
+  roomId              String?
+  wifiScanSessionId   String?
+  band                CoverageBand
+  sampleCount         Int                     @default(0)
+  averageRssi         Decimal?
+  strongestRssi       Int?
+  weakestRssi         Int?
+  coverageScore       Decimal?
+  confidenceScore     Decimal?
+  deadZoneSampleCount Int                     @default(0)
+  poorSampleCount     Int                     @default(0)
+  scoreReason         String?
+  aggregatedAt        DateTime                @default(now())
+  status              EntityStatus            @default(active)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  createdBy           String?
+  updatedBy           String?
+  archivedAt          DateTime?
+  archivedBy          String?
+
+  facility Facility         @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  building Building?        @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  floor    Floor?           @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  zone     Zone?            @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  room     Room?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  session  WifiScanSession? @relation(fields: [wifiScanSessionId], references: [id], onDelete: SetNull)
+
+  @@index([facilityId, scope, aggregatedAt])
+  @@index([floorId, scope, aggregatedAt])
+  @@index([zoneId, scope, aggregatedAt])
+  @@index([roomId, scope, aggregatedAt])
+  @@index([wifiScanSessionId, aggregatedAt])
+}
+
+model Incident {
+  id                String       @id @default(uuid())
+  facilityId        String
+  buildingId        String?
+  floorId           String?
+  zoneId            String?
+  roomId            String?
+  name              String
+  code              String?
+  incidentType      String?
+  severity          RiskLevel
+  reportedAt        DateTime
+  resolvedAt        DateTime?
+  resolutionSummary String?
+  status            EntityStatus @default(active)
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  archivedAt        DateTime?
+  archivedBy        String?
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId, status, reportedAt])
+  @@index([floorId, status, reportedAt])
+}
+
+model RiskItem {
+  id                String       @id @default(uuid())
+  facilityId        String
+  buildingId        String?
+  floorId           String?
+  zoneId            String?
+  roomId            String?
+  name              String
+  code              String?
+  category          String
+  severity          RiskLevel
+  score             Decimal?
+  scoreReason       String?
+  sourceType        String?
+  sourceReferenceId String?
+  isSystemGenerated Boolean      @default(false)
+  status            EntityStatus @default(active)
+  notes             String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  createdBy         String?
+  updatedBy         String?
+  archivedAt        DateTime?
+  archivedBy        String?
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId, status, severity])
+  @@index([floorId, status, severity])
+  @@index([sourceType, sourceReferenceId])
+}
+
+model ReadinessScore {
+  id                    String       @id @default(uuid())
+  facilityId            String
+  buildingId            String?
+  floorId               String?
+  calculatedAt          DateTime
+  overallScore          Decimal
+  infrastructureScore   Decimal?
+  coverageScore         Decimal?
+  supportScore          Decimal?
+  calculationVersion    String?      @default("t10-v1")
+  scoreDetailsJson      String?
+  coverageAssessmentCount Int        @default(0)
+  activeIncidentCount   Int          @default(0)
+  activeRiskItemCount   Int          @default(0)
+  status                EntityStatus @default(active)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  createdBy             String?
+  updatedBy             String?
+  archivedAt            DateTime?
+  archivedBy            String?
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId, calculatedAt])
+  @@index([floorId, calculatedAt])
+}
+
+model AuditLog {
+  id              String       @id @default(uuid())
+  actorUserId     String?
+  action          String
+  entityType      String
+  entityId        String?
+  summary         String
+  beforeStateJson String?
+  afterStateJson  String?
+  status          EntityStatus @default(active)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdBy       String?
+  updatedBy       String?
+  archivedAt      DateTime?
+  archivedBy      String?
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
